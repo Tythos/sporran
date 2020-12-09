@@ -4,18 +4,20 @@
 import os
 import random
 import flask
+from gevent import pywsgi
 
-PACK_PATH, _ = os.path.split(os.path.abspath(__file__))
-application = flask.Flask("sporran")
+MOD_ROOT, _ = os.path.split(os.path.abspath(__file__))
+_, MOD_NAME = os.path.split(MOD_ROOT)
+APP = flask.Flask(MOD_NAME)
 
-@application.route("/")
+@APP.route("/")
 def index():
     """Root-level response routed to index
     """
-    with open(PACK_PATH + "/static/index.html", 'r') as f:
+    with open(MOD_ROOT + "/static/index.html", 'r') as f:
         return f.read()
 
-@application.route("/getRandomBytes")
+@APP.route("/getRandomBytes")
 def getRandomBytes(length=64):
     """Procedural response
     """
@@ -23,19 +25,19 @@ def getRandomBytes(length=64):
         length = int(flask.request.args.get("length"))
     return b"%x" % random.getrandbits(length)
 
-@application.route("/js/<path:path>")
+@APP.route("/<path:path>")
 def static_js(path):
-    """Static file router for JavaScript resources
+    """Static file router
     """
-    return flask.send_from_directory(PACK_PATH + "/static/js", path)
+    return flask.send_from_directory(MOD_ROOT + "/static", path)
 
-@application.route("/sty/<path:path>")
-def static_sty(path):
-    """Static file router for styling resources
+def main():
+    """Hosts service (Flask WSGI application) using gevent
     """
-    return flask.send_from_directory(PACK_PATH + "/static/sty", path)
+    host = os.getenv("SERVICE_HOST", "0.0.0.0")
+    port = int(os.getenv("SERVICE_PORT", "8421"))
+    print("Starting %s service at %s:%u..." % (MOD_NAME, host, port))
+    pywsgi.WSGIServer((host, port), APP).serve_forever()
 
 if __name__ == "__main__":
-    application.config["ENV"] = "development"
-    application.config["DEBUG"] = True
-    application.run()
+    main()
